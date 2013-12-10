@@ -153,7 +153,7 @@ public class GeomagneticFieldCalculation implements Runnable
 			printOutput(out, alt, lat, lon, b, elem);
 		}
 		out.close();
-		System.out.println("Check output file: " + output);	
+		System.out.println("Check in your home directory the output file: " + output);	
 	}
 
 	private void printOutputHeader(PrintStream stream) {
