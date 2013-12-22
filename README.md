@@ -25,14 +25,14 @@ mvn exec:java
 As output comes:
 <pre>
 Calculation of Geomagnetic Field for 39412U
-The TLEFile used is /home/user/ardusat.tle
+The TLEFile used is /home/famipita/ardusat.tle
 The duration in seconds is: 6000.0
 The timestep in seconds is: 20
-The initial date is: 2012-12-20T12:00:00.000
-The final   date is: 2012-12-20T13:40:00.000
+The initial date is: 2013-12-20T12:00:00.000
+The final   date is: 2013-12-20T13:40:00.000
 The TLE used is:
-1 39412U 98067DA  13332.31589257  .00048279  00000-0  78876-3 0   328
-2 39412 051.6512 015.0820 0004249 059.7435 037.7484 15.52056926  1352
+1 39412U 98067DA  13354.31648267  .00083988  00000-0  12110-2 0   952
+2 39412 051.6499 265.5298 0006520 145.9879 311.6308 15.55250916  4777
 Check in your home directory the output file: ardusat_geomagnetic_field.dat
 </pre>
 

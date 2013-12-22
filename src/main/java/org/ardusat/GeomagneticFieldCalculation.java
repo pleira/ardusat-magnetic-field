@@ -98,7 +98,7 @@ public class GeomagneticFieldCalculation implements Runnable
         tles.loadData(stream, name);			
 		duration = conf.hasPath("duration") ? conf.getDouble("duration") : 6000;
 		timestep = conf.hasPath("timestep") ? conf.getInt("timestep") : 20;
-		final String start = conf.hasPath("start") ? conf.getString("start") : "2012-12-20T12:00:00";
+		final String start = conf.hasPath("start") ? conf.getString("start") : "2013-12-20T12:00:00";
 		final UTCScale utc = TimeScalesFactory.getUTC();
 		startDate = new AbsoluteDate(start, utc);
 		endDate = startDate.shiftedBy(duration);
