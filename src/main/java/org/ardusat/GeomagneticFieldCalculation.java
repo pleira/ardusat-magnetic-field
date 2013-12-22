@@ -15,6 +15,7 @@ import org.orekit.data.DataProvider;
 import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
 import org.orekit.errors.OrekitException;
+import org.orekit.frames.FactoryManagedFrame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.models.earth.GeoMagneticElements;
 import org.orekit.models.earth.GeoMagneticField;
@@ -28,6 +29,7 @@ import org.orekit.time.AbsoluteDate;
 import org.orekit.time.DateComponents;
 import org.orekit.time.TimeScalesFactory;
 import org.orekit.utils.Constants;
+import org.orekit.utils.IERSConventions;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -136,14 +138,15 @@ public class GeomagneticFieldCalculation implements Runnable
 		printOutputHeader(out);
 		// printOutputHeader(System.out);
 		
+		final FactoryManagedFrame ITRF = FramesFactory.getITRF(IERSConventions.IERS_2010, true); // tidal effects ignored
+		final OneAxisEllipsoid OAE = new OneAxisEllipsoid(
+				Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+				Constants.WGS84_EARTH_FLATTENING,
+				ITRF);
 		for (SpacecraftState state : states) {
 			Orbit o = state.getOrbit();
-			Vector3D p = o.getPVCoordinates(FramesFactory.getITRF2008()).getPosition();			
-			OneAxisEllipsoid oae = new OneAxisEllipsoid(
-					Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
-					Constants.WGS84_EARTH_FLATTENING,
-					FramesFactory.getITRF2008());
-			GeodeticPoint gp = oae.transform(p, FramesFactory.getITRF2008(), o.getDate());
+			Vector3D p = o.getPVCoordinates().getPosition();			
+			GeodeticPoint gp = OAE.transform(p, ITRF, o.getDate());
 			double alt = gp.getAltitude() / 1000;
 			double lat = FastMath.toDegrees(gp.getLatitude());
 			double lon = FastMath.toDegrees(gp.getLongitude());
