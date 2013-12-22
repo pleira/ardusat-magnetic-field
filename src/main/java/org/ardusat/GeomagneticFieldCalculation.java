@@ -1,6 +1,7 @@
 package org.ardusat;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -24,10 +25,13 @@ import org.orekit.orbits.Orbit;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
+import org.orekit.propagation.analytical.tle.TLESeries;
 import org.orekit.propagation.sampling.OrekitFixedStepHandler;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.DateComponents;
+import org.orekit.time.DateTimeComponents;
 import org.orekit.time.TimeScalesFactory;
+import org.orekit.time.UTCScale;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 
@@ -38,8 +42,10 @@ import com.typesafe.config.ConfigFactory;
  * <p>This class calculates the geomagnetic field components of an earth orbiting 
  * satellite along its orbit.
  * 
- * <p>Configuration parameters must be given in the application.conf file. That
- * includes TLE orbital data for the satellite. Models are up to orbits 600 kms high. 
+ * <p>Configuration parameters must be given in the application.conf file. 
+ * The TLE orbital data for the satellite is given apart. 
+ * 
+ * Geomagnetic Models are valid for orbits up to 600 kms high. 
  *   
  * <p>For properly configuring OREKIT, you must place in {user.home}/.orekit-data 
  * the geomagnetic model files IGRF.COF and WMM.COF. 
@@ -55,7 +61,7 @@ import com.typesafe.config.ConfigFactory;
 public class GeomagneticFieldCalculation implements Runnable
 {
 
-	public static void main( String[] args ) throws OrekitException
+	public static void main( String[] args ) throws Exception
 	{
 		new GeomagneticFieldCalculation().run();
 	}
@@ -65,40 +71,57 @@ public class GeomagneticFieldCalculation implements Runnable
 	final int timestep; 
 	final String output;
 	final String outDir;
+	final String input;
+	final String inDir;
+	final String name;
 	final GeoMagneticField model;
+	final TLESeries tles;
 	final TLE tle;
 	final double year;
-
-	GeomagneticFieldCalculation() throws OrekitException {
-		Config conf = ConfigFactory.load();
+	final Config conf = ConfigFactory.load();
+	final AbsoluteDate startDate;
+	final AbsoluteDate endDate;
+	
+	GeomagneticFieldCalculation() throws Exception {
+		name   = conf.hasPath("sat.code.name") ? conf.getString("sat.code.name") : "39412U";
 		outDir = conf.hasPath("output.dir") ? conf.getString("output.dir") : System.getProperty("user.home");
+		
 		output = conf.hasPath("output.file") ? conf.getString("output.file") : "ardusat_geomagnetic_field.dat";
+		inDir = conf.hasPath("input.tle.dir") ? conf.getString("input.tle.dir") : System.getProperty("user.home");
+		input = conf.hasPath("input.tle.file") ? conf.getString("input.tle.file") : "ardusat.tle";
 		String orekitData = conf.hasPath("orekit") ?  conf.getString("orekit") : System.getProperty("user.home") + "/.orekit-data";
 		DataProvider provider = new DirectoryCrawler(new File(orekitData));
 		DataProvidersManager.getInstance().addProvider(provider);
-		if (conf.hasPath("tle.line.1") && conf.hasPath("tle.line.2")) {
-			tle = new TLE(conf.getString("tle.line.1"), conf.getString("tle.line.2"));
-		} else {
-			// 39412U object related to the ISS for the date 2013-12-09
-			tle = new TLE("1 39412U 98067DA  13343.12890038  .00068429  00000-0  10624-2 0   630",
-					"2 39412  51.6509 321.3059 0005304  96.9471 359.5554 15.53317866  3035");
-		}
+		
+        tles = new TLESeries(null, true); // pattern matching with .tle and ignore non tle lines
+        FileInputStream stream = new FileInputStream(new File(inDir, input));
+        tles.loadData(stream, name);			
 		duration = conf.hasPath("duration") ? conf.getDouble("duration") : 6000;
 		timestep = conf.hasPath("timestep") ? conf.getInt("timestep") : 20;
-		DateComponents dt = tle.getDate().getComponents(TimeScalesFactory.getUTC()).getDate();
+		final String start = conf.hasPath("start") ? conf.getString("start") : "2012-12-20T12:00:00";
+		final UTCScale utc = TimeScalesFactory.getUTC();
+		startDate = new AbsoluteDate(start, utc);
+		endDate = startDate.shiftedBy(duration);
+		tle = tles.getClosestTLE(startDate);
+		final DateTimeComponents dtc = startDate.getComponents(utc);
+		final DateComponents dt = dtc.getDate();
 		year = GeoMagneticField.getDecimalYear(dt.getDay(), dt.getMonth(), dt.getYear());
 		model = GeoMagneticFieldFactory.getWMM(year);
-		System.out.println("Calculation of Geomagnetic Field" );
-		System.out.println("The TLE used is:\n" + tle.toString());
+		System.out.println("Calculation of Geomagnetic Field for " + name);
+		System.out.println("The TLEFile used is " + inDir + "/" + input);
 		System.out.println("The duration in seconds is: " + duration);
 		System.out.println("The timestep in seconds is: " + timestep);
+		System.out.println("The initial date is: " + startDate.toString());
+		System.out.println("The final   date is: " + endDate.toString());
+		System.out.println("The TLE used is:\n" + tle.toString());
+		
 	}
 
 	@Override
 	public void run() {
 		StatesHandler stepHandler = new StatesHandler();
 		try {
-			List<SpacecraftState> states = calculateStates(tle, duration, timestep, stepHandler);
+			List<SpacecraftState> states = calculateStates(tle, startDate, endDate, timestep, stepHandler);
 			save(states);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -118,19 +141,8 @@ public class GeomagneticFieldCalculation implements Runnable
 	 * but should should be set up with a frame that represents Earth rotation 
 	 * (i.e. which is fixed with respect to Earth), like ITRF. 
 	 * 
-	 * We give a position in ITRF, then we use ITRF as the second argument. 
-	 * You cannot mix. The reason for that is that if you give a position in first argument, 
-	 * you specify in the second argument in which frame you did provide the first argument, 
-	 * then the object which remembers the rotating frame in which it was built will do the transform 
-	 * if it need to. 
-	 * So if you decided to already provides the position in ITRF *and* passed ITRF as the second argument, 
-	 * then the object will notice it is already the same frame it was built with and it will not transform 
-	 * the cartesian position before computing the angle.
-	 *  
-	 * If on the other hand you provide a position in EME2000 *and* pass EME2000 as the second argument, 
-	 * then the object will notice EME2000 is not the same as the ITRF frame it was built with, 
-	 * so it will first perform the transformation to convert the EME2000 position into ITRF 
-	 * and then compute the angles. 
+	 * We give a position in ITRF, then we use ITRF as the second argument to transform coordinates with 
+	 * respect the Earth Ellipsoid. 
 	 */
 	private void save(List<SpacecraftState> states) throws IOException, OrekitException {
 		final File file = new File(outDir, output);
@@ -174,14 +186,10 @@ public class GeomagneticFieldCalculation implements Runnable
 		stream.format(fmt3 + "\n", elem.getInclination(),elem.getDeclination());		
 	}
 
-	public static List<SpacecraftState> calculateStates(TLE tle, double duration, double timestep, StatesHandler handler) 
+	public static List<SpacecraftState> calculateStates(TLE tle, AbsoluteDate initialDate, AbsoluteDate endDate, double timestep, StatesHandler handler) 
 			throws OrekitException {
 		TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle, InertialProvider.EME2000_ALIGNED, 1);
 		propagator.setMasterMode(timestep, handler);
-		AbsoluteDate initialDate = tle.getDate();        
-		AbsoluteDate endDate = initialDate.shiftedBy(duration);
-		System.out.println("The tle initial date used is: " + initialDate.toString());
-		System.out.println("The tle final date used is: " + endDate.toString());
 		handler.init(null, initialDate);
 		propagator.propagate(initialDate, endDate);
 		return handler.getStates();
