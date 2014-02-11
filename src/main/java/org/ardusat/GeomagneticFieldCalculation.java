@@ -83,7 +83,7 @@ public class GeomagneticFieldCalculation implements Runnable
 	final AbsoluteDate endDate;
 	
 	GeomagneticFieldCalculation() throws Exception {
-		name   = conf.hasPath("sat.code.name") ? conf.getString("sat.code.name") : "39412U";
+		name   = conf.hasPath("sat.code.name") ? conf.getString("sat.code.name") : "39414U"; // default ARDUSAT-X
 		outDir = conf.hasPath("output.dir") ? conf.getString("output.dir") : System.getProperty("user.home");
 		
 		output = conf.hasPath("output.file") ? conf.getString("output.file") : "ardusat_geomagnetic_field.dat";
@@ -98,7 +98,7 @@ public class GeomagneticFieldCalculation implements Runnable
         tles.loadData(stream, name);			
 		duration = conf.hasPath("duration") ? conf.getDouble("duration") : 6000;
 		timestep = conf.hasPath("timestep") ? conf.getInt("timestep") : 20;
-		final String start = conf.hasPath("start") ? conf.getString("start") : "2013-12-20T12:00:00";
+		final String start = conf.hasPath("start") ? conf.getString("start") : "2014-02-10T12:00:00";
 		final UTCScale utc = TimeScalesFactory.getUTC();
 		startDate = new AbsoluteDate(start, utc);
 		endDate = startDate.shiftedBy(duration);
@@ -108,7 +108,7 @@ public class GeomagneticFieldCalculation implements Runnable
 		year = GeoMagneticField.getDecimalYear(dt.getDay(), dt.getMonth(), dt.getYear());
 		model = GeoMagneticFieldFactory.getWMM(year);
 		System.out.println("Calculation of Geomagnetic Field for " + name);
-		System.out.println("The TLEFile used is " + inDir + "/" + input);
+		System.out.println("The TLE File used is " + inDir + "/" + input);
 		System.out.println("The duration in seconds is: " + duration);
 		System.out.println("The timestep in seconds is: " + timestep);
 		System.out.println("The initial date is: " + startDate.toString());
